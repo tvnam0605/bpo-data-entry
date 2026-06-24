@@ -317,10 +317,9 @@ export default function BPOPage() {
     showToast(`Đã cut ${r2 - r1 + 1} hàng × ${c2 - c1 + 1} cột`)
   }, [copySelection, saveCell, showToast])
 
-  const handlePaste = useCallback(() => {
+  const applyPasteData = useCallback((data: string[][]) => {
     const cell = selectedRef.current
-    if (!cell || !clipboardRef.current.length) return
-    const data = clipboardRef.current
+    if (!cell || !data.length) return
     const { r: startR, c: startC } = cell
     const newGrid = gridRef.current.map(row => [...row])
     const changes: { r: number; c: number; oldVal: string; newVal: string }[] = []
@@ -344,8 +343,14 @@ export default function BPOPage() {
     undoStack.current.push(changes)
     changes.forEach(ch => saveCell(ch.r, ch.c, ch.newVal))
     clipboardRef.current = []
-    showToast(`Đã paste`)
+    showToast('Đã paste')
   }, [saveCell, showToast])
+
+  const handlePaste = useCallback(() => {
+    if (clipboardRef.current.length) {
+      applyPasteData(clipboardRef.current)
+    }
+  }, [applyPasteData])
 
   const handleUndo = useCallback(() => {
     const last = undoStack.current.pop()
@@ -429,6 +434,15 @@ export default function BPOPage() {
       stopEdit()
     }
   }, [commitEdit, stopEdit, scrollToRow, handleUndo])
+
+  const handleNativePaste = useCallback((e: React.ClipboardEvent) => {
+    if (editModeRef.current) return
+    e.preventDefault()
+    const text = e.clipboardData.getData('text/plain')
+    if (!text) return
+    const data = text.split('\n').map(row => row.split('\t'))
+    applyPasteData(data)
+  }, [applyPasteData])
 
   const handleCellMouseDown = useCallback((e: React.MouseEvent, r: number, c: number) => {
     if (e.shiftKey && selectedRef.current) {
@@ -532,7 +546,7 @@ export default function BPOPage() {
         </span>
       </div>
 
-      <div ref={tableWrapRef} className="flex-1 overflow-auto relative outline-none" onKeyDown={handleGridKeyDown} tabIndex={-1}>
+      <div ref={tableWrapRef} className="flex-1 overflow-auto relative outline-none" onKeyDown={handleGridKeyDown} onPaste={handleNativePaste} tabIndex={-1}>
         <table className="border-collapse" style={{ tableLayout: 'fixed' }}>
           <colgroup>
             <col style={{ width: ROW_HEADER_WIDTH, minWidth: ROW_HEADER_WIDTH }} />
